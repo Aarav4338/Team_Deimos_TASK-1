@@ -1,0 +1,10 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: mybot_description
+    relative_path: urdf/mybot.urdf
+  srdf:
+    relative_path: config/arm.srdf
+  package_settings:
+    author_name: Aarav
+    author_email: arg4568.agr1@gmail.com
+    generated_timestamp: 1776712380
