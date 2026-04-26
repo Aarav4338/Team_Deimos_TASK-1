@@ -158,45 +158,7 @@ The Setup Assistant is a GUI tool that generates the `mybot_moveit_config` packa
 | Launch Files | Generates `demo.launch.py` and supporting launch files. |
 | Configuration Files | Writes all generated files to the output package directory. |
 
-### Path Planning and OMPL
 
-MoveIt 2 uses the Open Motion Planning Library (OMPL) as its default planning pipeline. The planning process works as follows:
-
-1. The user sets a goal (joint-space target or Cartesian pose target).
-2. If the goal is a Cartesian pose, the inverse kinematics solver (KDL in this project) converts it to a joint-space goal. For under-actuated arms (fewer than 6 DOF), `position_only_ik: true` must be enabled so the solver ignores orientation.
-3. OMPL samples random configurations in the joint space and builds a search tree (using algorithms such as RRT, RRT-Star, or PRM).
-4. At each sample, OMPL queries the planning scene for collision checks. If a sampled configuration causes the robot to intersect with any collision object (including the self-collision matrix), the sample is discarded.
-5. Once a valid path from the start state to the goal state is found, OMPL returns the path as a sequence of waypoints.
-6. MoveIt applies time parameterisation to the waypoint sequence, converting it into a smooth trajectory that respects velocity and acceleration limits defined in `joint_limits.yaml`.
-
-### Inverse Kinematics (IK)
-
-Inverse kinematics is the process of computing joint angles that place the end-effector at a desired position and orientation. In this project the KDL (Kinematics and Dynamics Library) plugin was used. Key observations:
-
-- KDL is a numerical iterative solver. It starts from the current joint configuration and iteratively adjusts joint angles to minimise the error between the current end-effector pose and the target pose.
-- For a 4-DOF arm, a full 6-DOF pose target (position + orientation) is under-constrained. The solver cannot find a solution because there are not enough joints to satisfy all six constraints simultaneously. Setting `position_only_ik: true` reduces the problem to 3 constraints (x, y, z), which the 4-DOF arm can satisfy.
-- The `kinematics_solver_timeout` parameter controls how long the solver iterates before giving up. A value too small (e.g., 0.005 s) causes premature failures; 0.05 s was sufficient for this arm.
-- The `kinematics_solver_search_resolution` parameter controls the discretisation of the joint space when searching for IK solutions. A smaller value increases accuracy but takes longer.
-
-### ROS 2 Control
-
-ROS 2 Control is a hardware abstraction framework that separates the controller logic from the hardware driver. In this project:
-
-- The URDF contains a `<ros2_control>` block that declares a `mock_components/GenericSystem` hardware plugin. This plugin simulates a real robot by accepting position commands and reporting back simulated joint states.
-- The `controller_manager` node loads and manages controllers at runtime. It reads `ros2_controllers.yaml` to determine which controllers to instantiate and which joints they control.
-- `JointTrajectoryController` is the controller type used for both the arm and the gripper. It receives a `FollowJointTrajectory` action goal (a time-parameterised sequence of joint positions) and forwards position commands to the hardware interface at the configured update rate (100 Hz).
-- The `joint_state_broadcaster` reads joint states from the hardware interface and publishes them on `/joint_states` so that RViz and the planning scene remain synchronised.
-
-### MoveIt Controllers vs ROS 2 Controllers
-
-These two configuration files serve different layers of the system:
-
-- `ros2_controllers.yaml` configures the **ros2_control layer**. It defines the controller types, the joints they manage, and the hardware command/state interfaces. This is what the `controller_manager` reads.
-- `moveit_controllers.yaml` configures the **MoveIt layer**. It tells MoveIt the names of the controllers, their action namespace (`follow_joint_trajectory`), and which joints they control. MoveIt uses this information to route planned trajectories to the correct controller via the `FollowJointTrajectory` action interface.
-
-The two files must be kept in sync: the controller names, joint lists, and interface types must match. If they diverge, MoveIt will either fail to find a controller for the planned trajectory or send it to the wrong one.
-
----
 
 ## Build Instructions
 
